@@ -1,0 +1,38 @@
+DROP TABLE IF EXISTS data_analysis.zl_ccs_trust_loan_schedule;
+create table data_analysis.zl_ccs_trust_loan_schedule as
+select  aa.*,
+        bb.change_time1
+ from
+ dws_dsst_ccs_ccs_trust_loan_schedule aa
+ left join 
+ (select max(TL_SCHEDULE_ID) as TL_SCHEDULE_ID1,TL_LOAN_NO,CURR_TERM,date(change_time) as change_time1
+ from 
+(select dd.*,
+        ee.change_time5
+FROM
+dws_dsst_ccs_ccs_trust_loan_schedule dd
+left JOIN
+(select TL_LOAN_NO,max(change_time) as change_time5,CURR_TERM
+from dws_dsst_ccs_ccs_trust_loan_schedule
+group by TL_LOAN_NO,CURR_TERM)ee on dd.TL_LOAN_NO=ee.TL_LOAN_NO and dd.change_time=ee.change_time5 and dd.CURR_TERM=ee.CURR_TERM
+where dd.change_time is not null
+and ee.change_time5 is not null)ff
+ group by TL_LOAN_NO,CURR_TERM,change_time1)bb
+ on aa.TL_SCHEDULE_ID=bb.TL_SCHEDULE_ID1
+ where bb.TL_SCHEDULE_ID1 is not NULL
+ and aa.change_time is not null;
+
+
+CREATE INDEX TL_SCHEDULE_ID_INDEX ON data_analysis.zl_ccs_trust_loan_schedule (TL_SCHEDULE_ID);
+
+DROP TABLE IF EXISTS data_analysis.zl_ccs_trust_loan_schedule1;
+create table data_analysis.zl_ccs_trust_loan_schedule1 as
+select a.*,
+       case when DATEDIFF(CURDATE(),a.DUE_DATE)>10 and a.PAID_CAPITAL<a.CAPITAL_AMOUNT and a.CAPITAL_AMOUNT>0
+       then 1 else 0 end as flag_overdue,
+	   case when a.CAPITAL_AMOUNT+a.OVERDUE_FINE+a.FEE_AMOUNT-a.PAID_CAPITAL-a.PAID_FEE-a.PAID_FINE<0 then 0 
+	        else a.CAPITAL_AMOUNT+a.OVERDUE_FINE+a.FEE_AMOUNT-a.PAID_CAPITAL-a.PAID_FEE-a.PAID_FINE end as AMT_BALANCE,
+       b.ACTIVED_TIME
+from data_analysis.zl_ccs_trust_loan_schedule a
+left join dws_dsst_open_qunar_credit b
+on a.CONTR_NBR=b.CONTRACT_NO;
